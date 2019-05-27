@@ -1,0 +1,47 @@
+<head>
+    <meta charset="UTF-8">
+    <title>Instagram Style Application</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <link href="styles.css" rel="stylesheet">
+</head>
+<header>
+    <div class="container">
+        <div class="profile">
+            <div class="profile-image">
+
+                <img src="https://i.imgflip.com/2/23ag7k.jpg" alt="">
+
+            </div>
+            <div class="profile-user-settings">
+                <h1 class="profile-user-name">nitaiaharoni</h1>
+                <br>
+
+                <input type='file' id="image_input" accept="image/*"/>
+                <input type="button" class="btn profile-add-btn" value="Add Picture" onclick="addPicture()"/>
+                <input type="button" id="application_button" value="Send" onclick="sendMail()"/>
+                <button class="btn profile-settings-btn" aria-label="profile settings"><i class="fas fa-cog"
+                                                                                          aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="profile-stats">
+                <ul>
+                    <li><span class="profile-stat-count">164</span> posts</li>
+                    <li><span class="profile-stat-count">188</span> followers</li>
+                    <li><span class="profile-stat-count">206</span> following</li>
+                </ul>
+            </div>
+            <div class="profile-bio">
+                <p><span class="profile-real-name">Nitai Aharoni</span> User's Bio 📷✈️🏕️</p>
+            </div>
+        </div>
+    </div>
+</header>
+<main>
+    <div class="container">
+        <div id="gallery" class="gallery">
+
+        </div>
+        <div class="loader"></div>
+    </div>
+</main>
+<script src='../src/images.js' type='text/javascript'></script>
