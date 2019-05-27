@@ -1,9 +1,4 @@
-# Created by .ignore support plugin (hsz.mobi)
-Cybereason/
 */node_modules/
-output/
-*/package-lock.json
-.idea/*
-*/.idea/
-*/.iml
-.iml
+package-lock.json
+.idea/
+*.iml
