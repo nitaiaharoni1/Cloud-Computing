@@ -7,8 +7,8 @@ let handler = exports.handler = async (event, context) => {
     // console.log("Event: "+JSON.stringify(event, undefined, 2));
     // console.log("Context: "+JSON.stringify(context, undefined, 2));
     try {
-        console.log("event.httpMethod: " + event.httpMethod);
-        if (event.httpMethod === "GET") {
+        console.log("event.path: " + event.path);
+        if (event.path === "/notify") {
             let plate = event.queryStringParameters.plate,
                 status = event.queryStringParameters.status,
                 parkingLotId = event.queryStringParameters.parkingLotId;
@@ -17,24 +17,96 @@ let handler = exports.handler = async (event, context) => {
             console.log("parkingLotId: " + parkingLotId);
             switch (status) {
                 case "exit":
-                    return exit(parkingLotId, plate);
-                    break;
+                    return await exit(parkingLotId, plate);
                 case "enter":
-                    console.log("Enter");
-                    return enter(parkingLotId, plate);
-                    break;
+                    return await enter(parkingLotId, plate);
             }
+        } else if (event.path === "/lotReport") {
+            let parkingLotId = event.queryStringParameters.parkingLotId;
+            return await lotReport(parkingLotId);
+        } else if (event.path === "/userReport") {
+            let plate = event.queryStringParameters.plate;
+            return await userReport(plate);
         }
     } catch (e) {
         console.error(e);
-        throw e;
+        return {Error: e.message}
     }
 };
+
+async function enter(parkingLotId, plate) {
+    await validateExit(plate, parkingLotId);
+    await putCar(plate, parkingLotId, Date.now(), 0);
+    return {"Success": `ENTER Car: ${plate}, Lot: ${parkingLotId}`}
+}
+
+async function exit(parkingLotId, plate) {
+    let lastEntrance = await getLastEntrance(plate, parkingLotId);
+    await updateCar(plate, parkingLotId, lastEntrance.enterTime, Date.now());
+    return {"Success": `EXIT Car: ${plate}, Lot: ${parkingLotId}`}
+}
+
+async function lotReport(parkingLotId) {
+    let params = {
+        TableName: "parkingLotDb",
+        IndexName: "parkingLotId-index",
+        KeyConditionExpression: 'parkingLotId = :parkingLotId',
+        ProjectionExpression: "plate, enterTime, exitTime",
+        FilterExpression: 'enterTime > :weekAgo AND exitTime < :now',
+        ExpressionAttributeValues: {
+            ':now': Date.now(),
+            ':weekAgo': Date.now() - (60 * 60 * 24 * 7 * 1000),
+            ':parkingLotId': parkingLotId,
+        },
+        ReturnConsumedCapacity: "TOTAL"
+    };
+    let res = await docClient.query(params).promise();
+    let report = {};
+    await res.Items.forEach(function (item) {
+        if (!report[item.plate]) {
+            report[item.plate] = 0;
+        }
+        if (item.exitTime === 0) {
+            item.exitTime = Date.now();
+        }
+        report[item.plate] += Math.floor(((item.exitTime - item.enterTime) / (1000 * 60 * 60)) * 100) / 100;
+    });
+    console.log("report: " + JSON.stringify(report));
+    return report;
+}
+
+async function userReport(plate) {
+    let params = {
+        TableName: "parkingLotDb",
+        KeyConditionExpression: 'plate = :plate',
+        ProjectionExpression: "parkingLotId, enterTime, exitTime",
+        FilterExpression: 'enterTime > :monthAgo AND exitTime < :now',
+        ExpressionAttributeValues: {
+            ':now': Date.now(),
+            ':monthAgo': Date.now() - (60 * 60 * 24 * 30 * 1000),
+            ':plate': plate,
+        },
+        ReturnConsumedCapacity: "TOTAL"
+    };
+    let res = await docClient.query(params).promise();
+    let report = {};
+    await res.Items.forEach(function (item) {
+        if (!report[item.parkingLotId]) {
+            report[item.parkingLotId] = 0;
+        }
+        if (item.exitTime === 0) {
+            item.exitTime = Date.now();
+        }
+        report[item.parkingLotId] += Math.floor(((item.exitTime - item.enterTime) / (1000 * 60 * 60) * 100)) / 100;
+    });
+    console.log("report: " + JSON.stringify(report));
+    return report;
+}
 
 async function validateExit(plate, parkingLotId) {
     let params = {
         TableName: "parkingLotDb",
-        KeyConditionExpression: `plate = :plate AND parkingLotId = :parkingLotId`,
+        KeyConditionExpression: 'plate = :plate AND parkingLotId = :parkingLotId',
         FilterExpression: 'exitTime = :0',
         ExpressionAttributeValues: {
             ':plate': plate,
@@ -43,51 +115,14 @@ async function validateExit(plate, parkingLotId) {
         },
         ReturnConsumedCapacity: "TOTAL"
     };
-
-    console.log("params: " + JSON.stringify(params));
     let res = await docClient.query(params).promise();
     console.log("res: " + JSON.stringify(res));
-    if (res.Count > 0) {
-        throw new Error("This car already entered this parking lot and didn't exit");
+    if (res.ScannedCount === 0 || res.Count === 0) {
+        return res.Items[0];
+    } else {
+        throw new Error("Too many entrances without exits");
     }
-}
-
-async function putCar(plate, parkingLotId, enterTime, exitTime) {
-    params = {
-        TableName: 'parkingLotDb',
-        Item: {
-            "plate": plate,
-            "parkingLotId": parkingLotId,
-            "enterTime": enterTime,
-            "exitTime": exitTime
-        }
-    };
-    console.log("params: " + JSON.stringify(params));
-    let res = await docClient.put(params).promise();
-    console.log("res: " + JSON.stringify(res));
-    return res;
-}
-
-async function updateCar(plate, parkingLotId, enterTime, exitTime) {
-    params = {
-        TableName: 'parkingLotDb',
-        Item: {
-            "plate": plate,
-            "parkingLotId": parkingLotId,
-            "enterTime": enterTime,
-            "exitTime": exitTime
-        }
-    };
-    console.log("params: " + JSON.stringify(params));
-    let res = await docClient.update(params).promise();
-    console.log("res: " + JSON.stringify(res));
-    return res;
-}
-
-async function enter(parkingLotId, plate) {
-    await validateExit(plate, parkingLotId);
-    return await putCar(plate, parkingLotId, Date.now(), 0);
-}
+};
 
 async function getLastEntrance(plate, parkingLotId) {
     let params = {
@@ -106,25 +141,58 @@ async function getLastEntrance(plate, parkingLotId) {
 
     let res = await docClient.query(params).promise();
     console.log("res: " + JSON.stringify(res));
-    if (res.Count !== 1) {
+    if (res.Count > 1) {
         throw new Error("Too many entrances without exits");
+    } else if(res.Count < 1){
+        throw new Error("Can't Exit if didn't enter");
     }
-    let lastEntrance = res.Items[0];
-    return lastEntrance;
+    return res.Items[0];
 }
 
-async function exit(parkingLotId, plate) {
-    let lastEntrance = await getLastEntrance(plate, parkingLotId);
-    return await updateCar(plate, parkingLotId, lastEntrance.enterTime, Date.now())
+async function putCar(plate, parkingLotId, enterTime, exitTime) {
+    let params = {
+        TableName: 'parkingLotDb',
+        Item: {
+            "plate": plate,
+            "parkingLotId": parkingLotId,
+            "enterTime": enterTime,
+            "exitTime": exitTime
+        }
+    };
+    console.log("params: " + JSON.stringify(params));
+    let res = await docClient.put(params).promise();
+    console.log("res: " + JSON.stringify(res));
+    return res;
+}
+
+async function updateCar(plate, parkingLotId, enterTime, exitTime) {
+    let params = {
+        TableName: 'parkingLotDb',
+        Key: {
+            "plate": plate,
+            "parkingLotId": parkingLotId
+        },
+        "ConditionExpression": "enterTime = :enterTime",
+        "UpdateExpression": "set exitTime = :exitTime",
+        "ExpressionAttributeValues": {
+            ":enterTime": enterTime,
+            ":exitTime": exitTime
+        },
+    };
+    console.log("params: " + JSON.stringify(params));
+    let res = await docClient.update(params).promise();
+    console.log("res: " + JSON.stringify(res));
+    return res;
 }
 
 let event = {
     "httpMethod": "GET",
+    "path": "/userReport",
     "queryStringParameters": {
-        "plate": "local",
-        "parkingLotId": "local",
-        "status": "exit"
+        "plate": "123456789",
+        "parkingLotId": "1",
+        "status": "enter"
     }
-}
+};
 
-handler(event)
+handler(event);
