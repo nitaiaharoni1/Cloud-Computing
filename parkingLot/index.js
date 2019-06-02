@@ -153,11 +153,21 @@ async function putCar(plate, parkingLotId, enterTime, exitTime) {
     let params = {
         TableName: 'parkingLotDb',
         Item: {
-            "plate": plate,
-            "parkingLotId": parkingLotId,
-            "enterTime": enterTime,
-            "exitTime": exitTime
-        }
+            "plate": {
+                S: plate
+            },
+            "parkingLotId": {
+                S: parkingLotId
+            },
+            "enterTime": {
+                N: enterTime
+            },
+            "exitTime": {
+                N: exitTime
+            }
+        },
+        Exists: false,
+        ReturnConsumedCapacity: "TOTAL",
     };
     console.log("params: " + JSON.stringify(params));
     let res = await docClient.put(params).promise();
