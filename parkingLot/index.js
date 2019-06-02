@@ -1,10 +1,9 @@
 const AWS = require('aws-sdk');
 const uniqid = require('uniqid');
-let awsConfig = require('C:/Users/i355539/.aws/local');
-AWS.config.update(awsConfig);
-let docClient = new AWS.DynamoDB.DocumentClient(/*{'region': 'us-west-2'}*/);
 
-let handler = exports.handler = async (event, context) => {
+let docClient = new AWS.DynamoDB.DocumentClient();
+
+exports.handler = async (event) => {
     // console.log("Event: "+JSON.stringify(event, undefined, 2));
     // console.log("Context: "+JSON.stringify(context, undefined, 2));
     try {
@@ -38,7 +37,7 @@ let handler = exports.handler = async (event, context) => {
 async function enter(parkingLotId, plate) {
     let res = await getCarStatus(plate, parkingLotId);
     if (res.ScannedCount === 0 || res.Count === 0) {
-        res = await newCarEnter(uniqid(), plate, parkingLotId);
+        await newCarEnter(plate, parkingLotId);
     } else {
         throw new Error("Too many entrances without exits");
     }
@@ -48,13 +47,14 @@ async function enter(parkingLotId, plate) {
 async function exit(parkingLotId, plate) {
     let res = await getCarStatus(plate, parkingLotId);
     //let lastEntrance = await getLastEntrance(plate, parkingLotId);
-    if (res.Count > 1) {
-        throw new Error("Too many entrances without exits");
-    } else if (res.Count < 1) {
+    if (res.Count < 1) {
         throw new Error("Can't Exit if didn't enter");
+    } else if (res.Count > 1) {
+        throw new Error("Too many entrances without exits");
+    } else {
+        await updateCarExit(res.Items[0].uniqid);
+        return {"Success": `EXIT Car: ${plate}, Lot: ${parkingLotId}`}
     }
-    await updateCar(plate, parkingLotId, lastEntrance.enterTime, Date.now());
-    return {"Success": `EXIT Car: ${plate}, Lot: ${parkingLotId}`}
 }
 
 async function lotReport(parkingLotId) {
@@ -89,6 +89,7 @@ async function lotReport(parkingLotId) {
 async function userReport(plate) {
     let params = {
         TableName: "parkingLotDb",
+        IndexName: "plate-parkingLotId-index",
         KeyConditionExpression: 'plate = :plate',
         ProjectionExpression: "parkingLotId, enterTime, exitTime",
         FilterExpression: 'enterTime > :monthAgo AND exitTime < :now',
@@ -130,52 +131,17 @@ async function getCarStatus(plate, parkingLotId) {
     let res = await docClient.query(params).promise();
     console.log("res: " + JSON.stringify(res));
     return res;
-};
-
-async function getLastEntrance(plate, parkingLotId) {
-    let params = {
-        TableName: "parkingLotDb",
-        KeyConditionExpression: `plate = :plate AND parkingLotId = :parkingLotId`,
-        FilterExpression: 'exitTime = :0',
-        ExpressionAttributeValues: {
-            ':plate': plate,
-            ':parkingLotId': parkingLotId,
-            ':0': 0,
-        },
-        ReturnConsumedCapacity: "TOTAL"
-    };
-
-    console.log("params: " + JSON.stringify(params));
-
-    let res = await docClient.query(params).promise();
-    console.log("res: " + JSON.stringify(res));
-    if (res.Count > 1) {
-        throw new Error("Too many entrances without exits");
-    } else if (res.Count < 1) {
-        throw new Error("Can't Exit if didn't enter");
-    }
-    return res.Items[0];
 }
 
-async function newCarEnter(uniqueId, plate, parkingLotId) {
+async function newCarEnter(plate, parkingLotId) {
     let params = {
         TableName: 'parkingLotDb',
         Item: {
-            "uniqid": {
-                S: uniqueId
-            },
-            "plate": {
-                S: plate
-            },
-            "parkingLotId": {
-                S: parkingLotId
-            },
-            "enterTime": {
-                N: Date.now()
-            },
-            "exitTime": {
-                N: 0
-            }
+            "uniqid": uniqid(),
+            "plate": plate,
+            "parkingLotId": parkingLotId,
+            "enterTime": Date.now(),
+            "exitTime": 0
         },
         ReturnConsumedCapacity: "TOTAL",
     };
@@ -185,17 +151,15 @@ async function newCarEnter(uniqueId, plate, parkingLotId) {
     return res;
 }
 
-async function updateCarEnter(uniqid, enterTime) {
+async function updateCarExit(uniqid) {
     let params = {
         TableName: 'parkingLotDb',
         Key: {
             "uniqid": uniqid,
         },
-        //"ConditionExpression": "enterTime = :enterTime",
         "UpdateExpression": "set exitTime = :exitTime",
         "ExpressionAttributeValues": {
-            ":enterTime": enterTime,
-            ":exitTime": exitTime
+            ":exitTime": Date.now()
         },
     };
     console.log("params: " + JSON.stringify(params));
@@ -204,14 +168,5 @@ async function updateCarEnter(uniqid, enterTime) {
     return res;
 }
 
-let event = {
-    "httpMethod": "GET",
-    "path": "/notify",
-    "queryStringParameters": {
-        "plate": "123456789",
-        "parkingLotId": "1",
-        "status": "enter"
-    }
-};
 
-handler(event);
+
