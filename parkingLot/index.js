@@ -1,14 +1,15 @@
-const AWS = require('aws-sdk');
-const uniqid = require('uniqid');
+const AWS = require('aws-sdk'),
+    uniqid = require('uniqid'),
+    axios = require('axios');
 
 let docClient = new AWS.DynamoDB.DocumentClient();
 
 exports.handler = async (event) => {
-    //console.log("Event: " + JSON.stringify(event, undefined, 2));
+    console.log("Event: " + JSON.stringify(event, undefined, 2));
     // console.log("Context: "+JSON.stringify(context, undefined, 2));
     try {
         console.log("event.path: " + event.path);
-        let plate, status, parkingLotId;
+        let plate, status, parkingLotId, report;
         switch (event.path) {
             case "/notify":
                 plate = event.queryStringParameters.plate;
@@ -26,11 +27,23 @@ exports.handler = async (event) => {
             case "/lotReport":
                 parkingLotId = event.queryStringParameters.parkingLotId;
                 console.log("parkingLotId: " + parkingLotId);
-                return await lotReport(parkingLotId);
+                report = await lotReport(parkingLotId);
+                return {
+                    statusCode: 200,
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({"Report": report})
+                };
             case "/userReport":
                 plate = event.queryStringParameters.plate;
                 console.log("plate: " + plate);
-                return await userReport(plate);
+                report = await userReport(plate);
+                return {
+                    statusCode: 200,
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({"Report": report})
+                };
+            case undefined:
+                await computeCharges(event.Records[0].dynamodb.NewImage.plate.S);
         }
     } catch (e) {
         console.error(e);
@@ -103,11 +116,7 @@ async function lotReport(parkingLotId) {
         report[item.plate] += Math.floor(((item.exitTime - item.enterTime) / (1000 * 60 * 60)) * 100) / 100;
     });
     console.log("report: " + JSON.stringify(report));
-    return {
-        statusCode: 200,
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({"Report": report})
-    }
+    return report;
 };
 
 async function userReport(plate) {
@@ -136,12 +145,26 @@ async function userReport(plate) {
         report[item.parkingLotId] += Math.floor(((item.exitTime - item.enterTime) / (1000 * 60 * 60) * 100)) / 100;
     });
     console.log("report: " + JSON.stringify(report));
-    return {
-        statusCode: 200,
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({"Report": report})
-    }
+    return report;
+}
 
+async function computeCharges(plate) {
+    let sumHours = 0;
+    let chargePerHour = 5;
+    let report = await userReport(plate);
+    for (let lot in report) {
+        sumHours += report[lot];
+    }
+    if (sumHours * chargePerHour > 50) {
+        return await axios({
+            method: 'get',
+            url: `http://charges.examples.com/charge`,
+            params: {
+                plate: plate
+            },
+            responseType: 'json'
+        });
+    }
 }
 
 async function getCarStatus(plate, parkingLotId) {
