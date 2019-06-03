@@ -4,33 +4,41 @@ const uniqid = require('uniqid');
 let docClient = new AWS.DynamoDB.DocumentClient();
 
 exports.handler = async (event) => {
-    // console.log("Event: "+JSON.stringify(event, undefined, 2));
+    //console.log("Event: " + JSON.stringify(event, undefined, 2));
     // console.log("Context: "+JSON.stringify(context, undefined, 2));
     try {
         console.log("event.path: " + event.path);
-        if (event.path === "/notify") {
-            let plate = event.queryStringParameters.plate,
-                status = event.queryStringParameters.status,
+        let plate, status, parkingLotId;
+        switch (event.path) {
+            case "/notify":
+                plate = event.queryStringParameters.plate;
+                status = event.queryStringParameters.status;
                 parkingLotId = event.queryStringParameters.parkingLotId;
-            console.log("plate: " + plate);
-            console.log("status: " + status);
-            console.log("parkingLotId: " + parkingLotId);
-            switch (status) {
-                case "exit":
-                    return await exit(parkingLotId, plate);
-                case "enter":
-                    return await enter(parkingLotId, plate);
-            }
-        } else if (event.path === "/lotReport") {
-            let parkingLotId = event.queryStringParameters.parkingLotId;
-            return await lotReport(parkingLotId);
-        } else if (event.path === "/userReport") {
-            let plate = event.queryStringParameters.plate;
-            return await userReport(plate);
+                console.log("plate: " + plate);
+                console.log("status: " + status);
+                console.log("parkingLotId: " + parkingLotId);
+                switch (status) {
+                    case "exit":
+                        return await exit(parkingLotId, plate);
+                    case "enter":
+                        return await enter(parkingLotId, plate);
+                }
+            case "/lotReport":
+                parkingLotId = event.queryStringParameters.parkingLotId;
+                console.log("parkingLotId: " + parkingLotId);
+                return await lotReport(parkingLotId);
+            case "/userReport":
+                plate = event.queryStringParameters.plate;
+                console.log("plate: " + plate);
+                return await userReport(plate);
         }
     } catch (e) {
         console.error(e);
-        return {Error: e.message}
+        return {
+            statusCode: 400,
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({"Error": e.message})
+        }
     }
 };
 
@@ -41,7 +49,13 @@ async function enter(parkingLotId, plate) {
     } else {
         throw new Error("Too many entrances without exits");
     }
-    return {"Success": `ENTER Car: ${plate}, Lot: ${parkingLotId}`}
+    return {
+        statusCode: 200,
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            "Success": `ENTER Car: ${plate}, Lot: ${parkingLotId}`
+        })
+    }
 }
 
 async function exit(parkingLotId, plate) {
@@ -53,7 +67,13 @@ async function exit(parkingLotId, plate) {
         throw new Error("Too many entrances without exits");
     } else {
         await updateCarExit(res.Items[0].uniqid);
-        return {"Success": `EXIT Car: ${plate}, Lot: ${parkingLotId}`}
+        return {
+            statusCode: 200,
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                "Success": `EXIT Car: ${plate}, Lot: ${parkingLotId}`
+            })
+        }
     }
 }
 
@@ -83,8 +103,12 @@ async function lotReport(parkingLotId) {
         report[item.plate] += Math.floor(((item.exitTime - item.enterTime) / (1000 * 60 * 60)) * 100) / 100;
     });
     console.log("report: " + JSON.stringify(report));
-    return report;
-}
+    return {
+        statusCode: 200,
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({"Report": report})
+    }
+};
 
 async function userReport(plate) {
     let params = {
@@ -112,7 +136,12 @@ async function userReport(plate) {
         report[item.parkingLotId] += Math.floor(((item.exitTime - item.enterTime) / (1000 * 60 * 60) * 100)) / 100;
     });
     console.log("report: " + JSON.stringify(report));
-    return report;
+    return {
+        statusCode: 200,
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({"Report": report})
+    }
+
 }
 
 async function getCarStatus(plate, parkingLotId) {

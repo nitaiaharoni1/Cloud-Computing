@@ -7,8 +7,8 @@ let enter = {
     "httpMethod": "GET",
     "path": "/notify",
     "queryStringParameters": {
-        "plate": "123456789",
-        "parkingLotId": "2",
+        "plate": "111111111",
+        "parkingLotId": "3",
         "status": "enter"
     }
 };
@@ -23,7 +23,7 @@ let exit = {
     }
 };
 
-let userReport = {
+let userRep = {
     "httpMethod": "GET",
     "path": "/userReport",
     "queryStringParameters": {
@@ -31,7 +31,7 @@ let userReport = {
     }
 };
 
-let lotReport = {
+let lotRep = {
     "httpMethod": "GET",
     "path": "/lotReport",
     "queryStringParameters": {
@@ -39,4 +39,4 @@ let lotReport = {
     }
 };
 
-handler(userReport);
+handler(enter);

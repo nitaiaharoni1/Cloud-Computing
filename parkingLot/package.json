@@ -1,5 +1,5 @@
 {
-  "name": "parkinglot",
+    "name": "parkingLot",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "aws-sdk": "^2.463.0"
+      "aws-sdk": "^2.466.0",
+      "uniqid": "^5.0.3"
   }
 }
