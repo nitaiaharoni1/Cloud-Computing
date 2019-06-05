@@ -93,12 +93,10 @@ async function exit(parkingLotId, plate) {
 async function lotReport(parkingLotId) {
     let params = {
         TableName: "parkingLotDb",
-        IndexName: "parkingLotId-index",
-        KeyConditionExpression: 'parkingLotId = :parkingLotId',
+        IndexName: "parkingLotId-enterTime-index",
+        KeyConditionExpression: 'parkingLotId = :parkingLotId AND enterTime > :weekAgo',
         ProjectionExpression: "plate, enterTime, exitTime",
-        FilterExpression: 'enterTime > :weekAgo AND exitTime < :now',
         ExpressionAttributeValues: {
-            ':now': Date.now(),
             ':weekAgo': Date.now() - (60 * 60 * 24 * 7 * 1000),
             ':parkingLotId': parkingLotId,
         },
@@ -122,12 +120,10 @@ async function lotReport(parkingLotId) {
 async function userReport(plate) {
     let params = {
         TableName: "parkingLotDb",
-        IndexName: "plate-parkingLotId-index",
-        KeyConditionExpression: 'plate = :plate',
+        IndexName: "plate-enterTime-index",
+        KeyConditionExpression: 'plate = :plate AND enterTime > :monthAgo',
         ProjectionExpression: "parkingLotId, enterTime, exitTime",
-        FilterExpression: 'enterTime > :monthAgo AND exitTime < :now',
         ExpressionAttributeValues: {
-            ':now': Date.now(),
             ':monthAgo': Date.now() - (60 * 60 * 24 * 30 * 1000),
             ':plate': plate,
         },

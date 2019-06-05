@@ -7,8 +7,8 @@ let enter = {
     "httpMethod": "GET",
     "path": "/notify",
     "queryStringParameters": {
-        "plate": "111111111",
-        "parkingLotId": "3",
+        "plate": "1243124132325",
+        "parkingLotId": "22",
         "status": "enter"
     }
 };
@@ -17,8 +17,8 @@ let exit = {
     "httpMethod": "GET",
     "path": "/notify",
     "queryStringParameters": {
-        "plate": "123456789",
-        "parkingLotId": "1",
+        "plate": "1243124132325",
+        "parkingLotId": "22",
         "status": "exit"
     }
 };
@@ -27,7 +27,7 @@ let userRep = {
     "httpMethod": "GET",
     "path": "/userReport",
     "queryStringParameters": {
-        "plate": "123456789",
+        "plate": "1243124132325",
     }
 };
 
@@ -64,4 +64,4 @@ let record = {
     }]
 };
 
-handler(record);
+handler(lotRep);
