@@ -6,6 +6,8 @@ Host:
 ```
 https://oybopy61c3.execute-api.us-west-2.amazonaws.com/prod
 ```
+
+
 ##### Car Enter/Exit:
 ```
 method: GET
@@ -17,6 +19,7 @@ path: /notify?parkingLotId=<PARKING LOT ID>&status=<STATUS>&plate=<CAR LICENSE P
 
 Gets car enter/exit and store the parking record into DynamoDB.
 
+
 ##### Parking Lot Report:
 ```
 method: GET
@@ -26,6 +29,8 @@ path: /lotReport?parkingLotId=<PARKING LOT ID>
 -  PARKING LOT ID is a string designating the specified parking lot.
 
 Gets a specific parking lot week report with plates number of the cars parked in it and their parking time.
+
+
 ##### User Car Report:
 ```
 method: GET
@@ -34,6 +39,8 @@ path: /userReport?plate=<CAR LICENSE PLATE>
 -  CAR LICENSE PLATE is the string of the car license plate.
 
 Gets a specific user's car report with lot ids of the lots that the car parked in and it's parking time at each one of them.
+
+
 ##### User Charges:
 dynamoDB Streams:
 at each update of a car status (/notify), dynamoDB triggers a call to the lambda function which calculate the user's charge (5$ hourly charge),
