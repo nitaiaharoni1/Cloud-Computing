@@ -64,6 +64,8 @@ at each update of a car status (/notify), dynamoDB triggers a call to the lambda
     - Sort key:       enterTime
     - *used to get a month time user report
 
-Concurrency:
-
-Consistency:
+##Consistency & Concurrency:
+ - The app makes sure to check the car's status before each it reports enter/exit to the lot. If a car entered in the past and didn't exit yet, it reports an error. If a car notifies an exit to a parking lot without an entrance, it also reports an error.
+ - When the parking lot manager or a car driver pulls up the stats for a parking lot or plate number, the app searchs the database and calculates the deltas between each entrance and exit. If there is no exit yet, It considers that as if the calculation of time is up to now. In such cases, when a car has not yet exited there may be inconsistencies with what actually exists in the database after getting the report.
+ - The entire system depends on AWS's integrity. In the event of a failure on their part, there is no way of knowing how the system will behave. Depending on the failure.
+ - Concurrency exists from Node.js and AWS being environments which operate asynchronously and parallel.
